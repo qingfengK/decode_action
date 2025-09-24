@@ -1,692 +1,527 @@
-//Tue Aug 19 2025 14:19:52 GMT+0000 (Coordinated Universal Time)
+//Wed Sep 24 2025 12:42:40 GMT+0000 (Coordinated Universal Time)
 //Base:https://github.com/echo094/decode-js
 //Modify:https://github.com/smallfawn/decode_action
-// prettier-ignore
-function randomPattern(pattern, chars = "abcdef0123456789") {
-  let result = "";
-  for (let char of pattern) {
-    if (char === "x") {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    } else if (char === "X") {
-      result += chars.charAt(Math.floor(Math.random() * chars.length)).toUpperCase();
-    } else {
-      result += char;
-    }
-  }
-  return result;
+const wxcode = require("./wxcode"),
+  fs = require("fs"),
+  path = require("path"),
+  crypto = require("crypto"),
+  https = require("https"),
+  http = require("http"),
+  {
+    URL
+  } = require("url"),
+  NOTICE_SWITCH = 1,
+  KAMI_VERIFY_SWITCH = 1,
+  APPID = "wx55da7d089eab6cdb",
+  KAMI_API_URL = "http://kami.19820121.xyz/api/verify.php",
+  KAMI_API_KEY = "6e62e481fe3f0ad007bb5a1df54bc0fa",
+  args = process.argv.slice(2),
+  getArg = _0x5f38c7 => {
+    const _0x298957 = args.indexOf("--" + _0x5f38c7);
+    return _0x298957 !== -1 && args[_0x298957 + 1] ? args[_0x298957 + 1] : null;
+  },
+  cmdWxid = getArg("wxid"),
+  isDebug = args.includes("--debug"),
+  wxidList = cmdWxid || process.env.LDHS_WXID || process.env.TXX_WXID || "",
+  kamiKey = process.env.TXX_KAMI || "",
+  scriptName = path.basename(__filename, ".js"),
+  TOKEN_CACHE_FILE = path.join(__dirname, scriptName + "_tokens.json");
+function parseWxidList(_0x10e992) {
+  if (!_0x10e992) return [];
+  return _0x10e992.split("\n").map(_0x13264d => _0x13264d.trim()).filter(_0x437fe4 => _0x437fe4.length > 0).filter(_0x30fb9f => !_0x30fb9f.startsWith("#"));
 }
-function getUuid() {
-  const uuid = [randomPattern("xxxxxxxx"), randomPattern("xxxx"), randomPattern("4xxx"), randomPattern("xxxx"), randomPattern("xxxxxxxxxxxx")];
-  return uuid.join("-");
+function generateDeviceId() {
+  const _0x1bf1cc = require("os"),
+    _0x318923 = _0x1bf1cc.hostname(),
+    _0x330036 = _0x318923 + "-node-script",
+    _0x77ec8b = crypto.createHash("md5").update(_0x330036).digest("hex").substring(0, 16);
+  return _0x77ec8b;
 }
-function getRandomChars(n = 16) {
-  const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  let result = "";
-  for (let i = 0; i < n; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-function md5(t, e) {
-  function n(t, e) {
-    return t << e | t >>> 32 - e;
-  }
-  function r(t, e) {
-    var n, r, o, i, a;
-    return o = 2147483648 & t, i = 2147483648 & e, a = (1073741823 & t) + (1073741823 & e), (n = 1073741824 & t) & (r = 1073741824 & e) ? 2147483648 ^ a ^ o ^ i : n | r ? 1073741824 & a ? 3221225472 ^ a ^ o ^ i : 1073741824 ^ a ^ o ^ i : a ^ o ^ i;
-  }
-  function o(t, e, o, i, a, u, c) {
-    return t = r(t, r(r(function (t, e, n) {
-      return t & e | ~t & n;
-    }(e, o, i), a), c)), r(n(t, u), e);
-  }
-  function i(t, e, o, i, a, u, c) {
-    return t = r(t, r(r(function (t, e, n) {
-      return t & n | e & ~n;
-    }(e, o, i), a), c)), r(n(t, u), e);
-  }
-  function a(t, e, o, i, a, u, c) {
-    return t = r(t, r(r(function (t, e, n) {
-      return t ^ e ^ n;
-    }(e, o, i), a), c)), r(n(t, u), e);
-  }
-  function u(t, e, o, i, a, u, c) {
-    return t = r(t, r(r(function (t, e, n) {
-      return e ^ (t | ~n);
-    }(e, o, i), a), c)), r(n(t, u), e);
-  }
-  function c(t) {
-    var e,
-      n = "",
-      r = "";
-    for (e = 0; e <= 3; e++) n += (r = "0" + (t >>> 8 * e & 255).toString(16)).substr(r.length - 2, 2);
-    return n;
-  }
-  var s,
-    l,
-    f,
-    p,
-    d,
-    h,
-    v,
-    y,
-    g,
-    m = Array();
-  for (m = function (t) {
-    for (var e, n = t.length, r = n + 8, o = 16 * ((r - r % 64) / 64 + 1), i = Array(o - 1), a = 0, u = 0; u < n;) a = u % 4 * 8, i[e = (u - u % 4) / 4] = i[e] | t.charCodeAt(u) << a, u++;
-    return a = u % 4 * 8, i[e = (u - u % 4) / 4] = i[e] | 128 << a, i[o - 2] = n << 3, i[o - 1] = n >>> 29, i;
-  }(t = function (t) {
-    t = t.replace(/\r\n/g, "\n");
-    for (var e = "", n = 0; n < t.length; n++) {
-      var r = t.charCodeAt(n);
-      r < 128 ? e += String.fromCharCode(r) : r > 127 && r < 2048 ? (e += String.fromCharCode(r >> 6 | 192), e += String.fromCharCode(63 & r | 128)) : (e += String.fromCharCode(r >> 12 | 224), e += String.fromCharCode(r >> 6 & 63 | 128), e += String.fromCharCode(63 & r | 128));
+async function verifyKami(_0xe2d193) {
+  return new Promise((_0x115cce, _0x1acabd) => {
+    if (!_0xe2d193) {
+      _0x115cce({
+        "success": false,
+        "code": 1,
+        "message": "未设置卡密，请设置环境变量 TXX_KAMI"
+      });
+      return;
     }
-    return e;
-  }(t)), h = 1732584193, v = 4023233417, y = 2562383102, g = 271733878, s = 0; s < m.length; s += 16) l = h, f = v, p = y, d = g, h = o(h, v, y, g, m[s + 0], 7, 3614090360), g = o(g, h, v, y, m[s + 1], 12, 3905402710), y = o(y, g, h, v, m[s + 2], 17, 606105819), v = o(v, y, g, h, m[s + 3], 22, 3250441966), h = o(h, v, y, g, m[s + 4], 7, 4118548399), g = o(g, h, v, y, m[s + 5], 12, 1200080426), y = o(y, g, h, v, m[s + 6], 17, 2821735955), v = o(v, y, g, h, m[s + 7], 22, 4249261313), h = o(h, v, y, g, m[s + 8], 7, 1770035416), g = o(g, h, v, y, m[s + 9], 12, 2336552879), y = o(y, g, h, v, m[s + 10], 17, 4294925233), v = o(v, y, g, h, m[s + 11], 22, 2304563134), h = o(h, v, y, g, m[s + 12], 7, 1804603682), g = o(g, h, v, y, m[s + 13], 12, 4254626195), y = o(y, g, h, v, m[s + 14], 17, 2792965006), h = i(h, v = o(v, y, g, h, m[s + 15], 22, 1236535329), y, g, m[s + 1], 5, 4129170786), g = i(g, h, v, y, m[s + 6], 9, 3225465664), y = i(y, g, h, v, m[s + 11], 14, 643717713), v = i(v, y, g, h, m[s + 0], 20, 3921069994), h = i(h, v, y, g, m[s + 5], 5, 3593408605), g = i(g, h, v, y, m[s + 10], 9, 38016083), y = i(y, g, h, v, m[s + 15], 14, 3634488961), v = i(v, y, g, h, m[s + 4], 20, 3889429448), h = i(h, v, y, g, m[s + 9], 5, 568446438), g = i(g, h, v, y, m[s + 14], 9, 3275163606), y = i(y, g, h, v, m[s + 3], 14, 4107603335), v = i(v, y, g, h, m[s + 8], 20, 1163531501), h = i(h, v, y, g, m[s + 13], 5, 2850285829), g = i(g, h, v, y, m[s + 2], 9, 4243563512), y = i(y, g, h, v, m[s + 7], 14, 1735328473), h = a(h, v = i(v, y, g, h, m[s + 12], 20, 2368359562), y, g, m[s + 5], 4, 4294588738), g = a(g, h, v, y, m[s + 8], 11, 2272392833), y = a(y, g, h, v, m[s + 11], 16, 1839030562), v = a(v, y, g, h, m[s + 14], 23, 4259657740), h = a(h, v, y, g, m[s + 1], 4, 2763975236), g = a(g, h, v, y, m[s + 4], 11, 1272893353), y = a(y, g, h, v, m[s + 7], 16, 4139469664), v = a(v, y, g, h, m[s + 10], 23, 3200236656), h = a(h, v, y, g, m[s + 13], 4, 681279174), g = a(g, h, v, y, m[s + 0], 11, 3936430074), y = a(y, g, h, v, m[s + 3], 16, 3572445317), v = a(v, y, g, h, m[s + 6], 23, 76029189), h = a(h, v, y, g, m[s + 9], 4, 3654602809), g = a(g, h, v, y, m[s + 12], 11, 3873151461), y = a(y, g, h, v, m[s + 15], 16, 530742520), h = u(h, v = a(v, y, g, h, m[s + 2], 23, 3299628645), y, g, m[s + 0], 6, 4096336452), g = u(g, h, v, y, m[s + 7], 10, 1126891415), y = u(y, g, h, v, m[s + 14], 15, 2878612391), v = u(v, y, g, h, m[s + 5], 21, 4237533241), h = u(h, v, y, g, m[s + 12], 6, 1700485571), g = u(g, h, v, y, m[s + 3], 10, 2399980690), y = u(y, g, h, v, m[s + 10], 15, 4293915773), v = u(v, y, g, h, m[s + 1], 21, 2240044497), h = u(h, v, y, g, m[s + 8], 6, 1873313359), g = u(g, h, v, y, m[s + 15], 10, 4264355552), y = u(y, g, h, v, m[s + 6], 15, 2734768916), v = u(v, y, g, h, m[s + 13], 21, 1309151649), h = u(h, v, y, g, m[s + 4], 6, 4149444226), g = u(g, h, v, y, m[s + 11], 10, 3174756917), y = u(y, g, h, v, m[s + 2], 15, 718787259), v = u(v, y, g, h, m[s + 9], 21, 3951481745), h = r(h, l), v = r(v, f), y = r(y, p), g = r(g, d);
-  return 32 == e ? (c(h) + c(v) + c(y) + c(g)).toLowerCase() : (c(v) + c(y)).toLowerCase();
-}
-function sha1(msg) {
-  function rotate_left(n, s) {
-    var t4 = n << s | n >>> 32 - s;
-    return t4;
-  }
-  ;
-  function lsb_hex(val) {
-    var str = "";
-    var i;
-    var vh;
-    var vl;
-    for (i = 0; i <= 6; i += 2) {
-      vh = val >>> i * 4 + 4 & 15;
-      vl = val >>> i * 4 & 15;
-      str += vh.toString(16) + vl.toString(16);
-    }
-    return str;
-  }
-  ;
-  function cvt_hex(val) {
-    var str = "";
-    var i;
-    var v;
-    for (i = 7; i >= 0; i--) {
-      v = val >>> i * 4 & 15;
-      str += v.toString(16);
-    }
-    return str;
-  }
-  ;
-  function Utf8Encode(string) {
-    string = string.replace(/\r\n/g, "\n");
-    var utftext = "";
-    for (var n = 0; n < string.length; n++) {
-      var c = string.charCodeAt(n);
-      if (c < 128) {
-        utftext += String.fromCharCode(c);
-      } else if (c > 127 && c < 2048) {
-        utftext += String.fromCharCode(c >> 6 | 192);
-        utftext += String.fromCharCode(c & 63 | 128);
-      } else {
-        utftext += String.fromCharCode(c >> 12 | 224);
-        utftext += String.fromCharCode(c >> 6 & 63 | 128);
-        utftext += String.fromCharCode(c & 63 | 128);
-      }
-    }
-    return utftext;
-  }
-  ;
-  var blockstart;
-  var i, j;
-  var W = new Array(80);
-  var H0 = 1732584193;
-  var H1 = 4023233417;
-  var H2 = 2562383102;
-  var H3 = 271733878;
-  var H4 = 3285377520;
-  var A, B, C, D, E;
-  var temp;
-  msg = Utf8Encode(msg);
-  var msg_len = msg.length;
-  var word_array = new Array();
-  for (i = 0; i < msg_len - 3; i += 4) {
-    j = msg.charCodeAt(i) << 24 | msg.charCodeAt(i + 1) << 16 | msg.charCodeAt(i + 2) << 8 | msg.charCodeAt(i + 3);
-    word_array.push(j);
-  }
-  switch (msg_len % 4) {
-    case 0:
-      i = 2147483648;
-      break;
-    case 1:
-      i = msg.charCodeAt(msg_len - 1) << 24 | 8388608;
-      break;
-    case 2:
-      i = msg.charCodeAt(msg_len - 2) << 24 | msg.charCodeAt(msg_len - 1) << 16 | 32768;
-      break;
-    case 3:
-      i = msg.charCodeAt(msg_len - 3) << 24 | msg.charCodeAt(msg_len - 2) << 16 | msg.charCodeAt(msg_len - 1) << 8 | 128;
-      break;
-  }
-  word_array.push(i);
-  while (word_array.length % 16 != 14) word_array.push(0);
-  word_array.push(msg_len >>> 29);
-  word_array.push(msg_len << 3 & 4294967295);
-  for (blockstart = 0; blockstart < word_array.length; blockstart += 16) {
-    for (i = 0; i < 16; i++) W[i] = word_array[blockstart + i];
-    for (i = 16; i <= 79; i++) W[i] = rotate_left(W[i - 3] ^ W[i - 8] ^ W[i - 14] ^ W[i - 16], 1);
-    A = H0;
-    B = H1;
-    C = H2;
-    D = H3;
-    E = H4;
-    for (i = 0; i <= 19; i++) {
-      temp = rotate_left(A, 5) + (B & C | ~B & D) + E + W[i] + 1518500249 & 4294967295;
-      E = D;
-      D = C;
-      C = rotate_left(B, 30);
-      B = A;
-      A = temp;
-    }
-    for (i = 20; i <= 39; i++) {
-      temp = rotate_left(A, 5) + (B ^ C ^ D) + E + W[i] + 1859775393 & 4294967295;
-      E = D;
-      D = C;
-      C = rotate_left(B, 30);
-      B = A;
-      A = temp;
-    }
-    for (i = 40; i <= 59; i++) {
-      temp = rotate_left(A, 5) + (B & C | B & D | C & D) + E + W[i] + 2400959708 & 4294967295;
-      E = D;
-      D = C;
-      C = rotate_left(B, 30);
-      B = A;
-      A = temp;
-    }
-    for (i = 60; i <= 79; i++) {
-      temp = rotate_left(A, 5) + (B ^ C ^ D) + E + W[i] + 3395469782 & 4294967295;
-      E = D;
-      D = C;
-      C = rotate_left(B, 30);
-      B = A;
-      A = temp;
-    }
-    H0 = H0 + A & 4294967295;
-    H1 = H1 + B & 4294967295;
-    H2 = H2 + C & 4294967295;
-    H3 = H3 + D & 4294967295;
-    H4 = H4 + E & 4294967295;
-  }
-  var temp = cvt_hex(H0) + cvt_hex(H1) + cvt_hex(H2) + cvt_hex(H3) + cvt_hex(H4);
-  return temp.toLowerCase();
-}
-function Env(t, e) {
-  class s {
-    constructor(t) {
-      this.env = t;
-    }
-    send(t, e = "GET") {
-      t = "string" == typeof t ? {
-        url: t
-      } : t;
-      let s = this.get;
-      return "POST" === e && (s = this.post), new Promise((e, r) => {
-        s.call(this, t, (t, s, a) => {
-          t ? r(t) : e(s);
+    const _0xaa83ea = generateDeviceId(),
+      _0x1396a7 = new URL(KAMI_API_URL);
+    _0x1396a7.searchParams.set("api_key", KAMI_API_KEY);
+    _0x1396a7.searchParams.set("card_key", _0xe2d193);
+    _0x1396a7.searchParams.set("device_id", _0xaa83ea);
+    const _0xeab520 = {
+        "hostname": _0x1396a7.hostname,
+        "port": _0x1396a7.port || (_0x1396a7.protocol === "https:" ? 443 : 80),
+        "path": _0x1396a7.pathname + _0x1396a7.search,
+        "method": "GET",
+        "headers": {
+          "User-Agent": "Node.js Script"
+        }
+      },
+      _0x5c5520 = _0x1396a7.protocol === "https:" ? https : http,
+      _0x54cf82 = _0x5c5520.request(_0xeab520, _0x2bc52f => {
+        let _0x4b7da9 = "";
+        _0x2bc52f.on("data", _0x48b7e4 => {
+          _0x4b7da9 += _0x48b7e4;
+        });
+        _0x2bc52f.on("end", () => {
+          if (!_0x4b7da9 || _0x4b7da9.trim() === "") {
+            _0x115cce({
+              "success": false,
+              "code": 3,
+              "message": "服务器返回空响应"
+            });
+            return;
+          }
+          try {
+            const _0x3f4c64 = JSON.parse(_0x4b7da9);
+            _0x3f4c64.code === 0 ? _0x115cce({
+              "success": true,
+              "code": _0x3f4c64.code,
+              "message": _0x3f4c64.message || _0x3f4c64.msg,
+              "data": _0x3f4c64.data
+            }) : _0x115cce({
+              "success": false,
+              "code": _0x3f4c64.code,
+              "message": _0x3f4c64.message || _0x3f4c64.msg || "卡密验证失败"
+            });
+          } catch (_0x570509) {
+            _0x115cce({
+              "success": false,
+              "code": 3,
+              "message": "解析响应失败: " + _0x570509.message + "，原始响应: " + _0x4b7da9
+            });
+          }
         });
       });
-    }
-    get(t) {
-      return this.send.call(this.env, t);
-    }
-    post(t) {
-      return this.send.call(this.env, t, "POST");
+    _0x54cf82.on("error", _0x39de52 => {
+      _0x115cce({
+        "success": false,
+        "code": 3,
+        "message": "网络请求失败: " + _0x39de52.message
+      });
+    });
+    _0x54cf82.setTimeout(10000, () => {
+      _0x54cf82.destroy();
+      _0x115cce({
+        "success": false,
+        "code": 3,
+        "message": "请求超时，请检查网络连接"
+      });
+    });
+    _0x54cf82.end();
+  });
+}
+class ScriptTemplate {
+  constructor(_0x3d062f) {
+    this.wxid = _0x3d062f;
+    this.appid = APPID;
+    this.isLogin = false;
+    this.wxCode = null;
+    this.openid = null;
+    this.mobileInfo = null;
+    this.userProfile = null;
+    this.token = null;
+    this.userInfo = null;
+    this.userScore = 0;
+    this.remarkName = typeof wxcode.getRemarkName === "function" ? wxcode.getRemarkName(_0x3d062f) : _0x3d062f;
+  }
+  ["loadTokenCache"]() {
+    try {
+      if (fs.existsSync(TOKEN_CACHE_FILE)) {
+        const _0x5cf523 = JSON.parse(fs.readFileSync(TOKEN_CACHE_FILE, "utf8")),
+          _0x46923d = _0x5cf523[this.wxid];
+        if (_0x46923d) {
+          this.openid = _0x46923d.openid;
+          this.mobileInfo = _0x46923d.mobileInfo;
+          this.userProfile = _0x46923d.userProfile;
+          this.token = _0x46923d.token;
+          this.userInfo = _0x46923d.userInfo;
+          this.userScore = _0x46923d.userScore || 0;
+          this.isLogin = true;
+          return true;
+        }
+      }
+    } catch (_0x37c555) {}
+    return false;
+  }
+  ["saveTokenCache"]() {
+    try {
+      let _0x53be1e = {};
+      if (fs.existsSync(TOKEN_CACHE_FILE)) {
+        try {
+          _0x53be1e = JSON.parse(fs.readFileSync(TOKEN_CACHE_FILE, "utf8"));
+        } catch (_0x12244f) {}
+      }
+      _0x53be1e[this.wxid] = {
+        "openid": this.openid,
+        "mobileInfo": this.mobileInfo,
+        "userProfile": this.userProfile,
+        "token": this.token,
+        "userInfo": this.userInfo,
+        "userScore": this.userScore
+      };
+      fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(_0x53be1e, null, 2), "utf8");
+    } catch (_0x522e43) {
+      console.log("❌ [" + this.remarkName + "] 保存缓存失败: " + _0x522e43.message);
     }
   }
-  return new class {
-    constructor(t, e) {
-      this.name = t, this.http = new s(this), this.data = null, this.dataFile = "box.dat", this.logs = [], this.isMute = !1, this.isNeedRewrite = !1, this.logSeparator = "\n", this.encoding = "utf-8", this.startTime = new Date().getTime(), Object.assign(this, e), this.log("", `🔔${this.name}, 开始!`);
-    }
-    getEnv() {
-      return "undefined" != typeof $environment && $environment["surge-version"] ? "Surge" : "undefined" != typeof $environment && $environment["stash-version"] ? "Stash" : "undefined" != typeof module && module.exports ? "Node.js" : "undefined" != typeof $task ? "Quantumult X" : "undefined" != typeof $loon ? "Loon" : "undefined" != typeof $rocket ? "Shadowrocket" : void 0;
-    }
-    isNode() {
-      return "Node.js" === this.getEnv();
-    }
-    isQuanX() {
-      return "Quantumult X" === this.getEnv();
-    }
-    isSurge() {
-      return "Surge" === this.getEnv();
-    }
-    isLoon() {
-      return "Loon" === this.getEnv();
-    }
-    isShadowrocket() {
-      return "Shadowrocket" === this.getEnv();
-    }
-    isStash() {
-      return "Stash" === this.getEnv();
-    }
-    toObj(t, e = null) {
-      try {
-        return JSON.parse(t);
-      } catch {
-        return e;
-      }
-    }
-    toStr(t, e = null) {
-      try {
-        return JSON.stringify(t);
-      } catch {
-        return e;
-      }
-    }
-    getjson(t, e) {
-      let s = e;
-      if (this.getdata(t)) try {
-        s = JSON.parse(this.getdata(t));
-      } catch {}
-      return s;
-    }
-    setjson(t, e) {
-      try {
-        return this.setdata(JSON.stringify(t), e);
-      } catch {
-        return !1;
-      }
-    }
-    getScript(t) {
-      return new Promise(e => {
-        this.get({
-          url: t
-        }, (t, s, r) => e(r));
+  async ["getWxCodeAndLogin"]() {
+    const _0x460b90 = await wxcode.getWxCode(this.wxid, this.appid);
+    if (!_0x460b90.success) return false;
+    return this.wxCode = _0x460b90.code, this.isLogin = true, true;
+  }
+  async ["getUserOpenid"]() {
+    const _0x247a49 = await wxcode.getOpenid(this.wxid, this.appid);
+    if (_0x247a49.success) {
+      this.openid = _0x247a49.openid;
+      if (isDebug) console.log("[DEBUG] [" + this.remarkName + "] 获取openid成功：" + this.openid);
+      return this.openid;
+    } else return console.log("[" + this.remarkName + "] 获取openid失败：" + _0x247a49.error), null;
+  }
+  async ["getMobileInfo"]() {
+    const _0xc03a7d = await wxcode.getmobile(this.wxid, this.appid);
+    if (_0xc03a7d.success) {
+      this.mobileInfo = _0xc03a7d;
+      if (isDebug) console.log("[DEBUG] [" + this.remarkName + "] 获取手机号加密数据成功");
+      return this.mobileInfo;
+    } else return console.log("[" + this.remarkName + "] 获取手机号失败：" + _0xc03a7d.error), null;
+  }
+  async ["loginToLvdhb"]() {
+    if (!this.wxCode) return console.log("❌ [" + this.remarkName + "] 登录失败：未获取到微信授权码"), false;
+    try {
+      const _0x2b091d = await this.makeHttpRequest("PUT", "https://www.lvdhb.com/MiniProgramApiCore/api/v3/login/auth", {
+        "Host": "www.lvdhb.com",
+        "content-type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13)XWEB/14185",
+        "Referer": "https://servicewechat.com/" + this.appid + "/139/page-frame.html"
+      }, {
+        "Source": "ldshu",
+        "Code": this.wxCode
       });
+      return _0x2b091d && _0x2b091d.token ? (this.token = _0x2b091d.token, true) : (console.log("❌ [" + this.remarkName + "] 登录失败"), false);
+    } catch (_0x5f4c39) {
+      return console.log("❌ [" + this.remarkName + "] 登录异常：" + _0x5f4c39.message), false;
     }
-    runScript(t, e) {
-      return new Promise(s => {
-        let r = this.getdata("@chavy_boxjs_userCfgs.httpapi");
-        r = r ? r.replace(/\n/g, "").trim() : r;
-        let a = this.getdata("@chavy_boxjs_userCfgs.httpapi_timeout");
-        a = a ? 1 * a : 20, a = e && e.timeout ? e.timeout : a;
-        const [i, o] = r.split("@"),
-          n = {
-            url: `http://${o}/v1/scripting/evaluate`,
-            body: {
-              script_text: t,
-              mock_type: "cron",
-              timeout: a
-            },
-            headers: {
-              "X-Key": i,
-              Accept: "*/*"
-            },
-            timeout: a
-          };
-        this.post(n, (t, e, r) => s(r));
-      }).catch(t => this.logErr(t));
+  }
+  async ["makeHttpRequest"](_0x15a801, _0x2b59e0, _0x320339 = {}, _0x2bd176 = null) {
+    return new Promise((_0x547013, _0x2dfb14) => {
+      const _0x3be638 = new URL(_0x2b59e0),
+        _0x43c9ab = {
+          "hostname": _0x3be638.hostname,
+          "port": _0x3be638.port || (_0x3be638.protocol === "https:" ? 443 : 80),
+          "path": _0x3be638.pathname + _0x3be638.search,
+          "method": _0x15a801,
+          "headers": _0x320339
+        },
+        _0x55715d = _0x3be638.protocol === "https:" ? https : http,
+        _0x1a5a11 = _0x55715d.request(_0x43c9ab, _0x4d05f3 => {
+          let _0x8af342 = "";
+          _0x4d05f3.on("data", _0x1bdb3d => {
+            _0x8af342 += _0x1bdb3d;
+          });
+          _0x4d05f3.on("end", () => {
+            try {
+              const _0x2ba1ee = JSON.parse(_0x8af342);
+              _0x547013(_0x2ba1ee);
+            } catch (_0x45cbc4) {
+              _0x547013(_0x8af342);
+            }
+          });
+        });
+      _0x1a5a11.on("error", _0x26fcfe => {
+        _0x2dfb14(_0x26fcfe);
+      });
+      _0x1a5a11.setTimeout(30000, () => {
+        _0x1a5a11.destroy();
+        _0x2dfb14(new Error("请求超时"));
+      });
+      _0x2bd176 && (_0x15a801 === "POST" || _0x15a801 === "PUT") && _0x1a5a11.write(JSON.stringify(_0x2bd176));
+      _0x1a5a11.end();
+    });
+  }
+  async ["getUserScore"]() {
+    if (!this.token) return false;
+    try {
+      const _0x4afbcf = await this.makeHttpRequest("GET", "https://www.lvdhb.com/MiniProgramApiCore/api/v3/My/GetMyScore", {
+        "Host": "www.lvdhb.com",
+        "token": this.token,
+        "content-type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13)XWEB/14185",
+        "Referer": "https://servicewechat.com/" + this.appid + "/139/page-frame.html"
+      });
+      return typeof _0x4afbcf === "number" || !isNaN(parseInt(_0x4afbcf)) ? (this.userScore = parseInt(_0x4afbcf), true) : false;
+    } catch (_0x2f1f8e) {
+      return false;
     }
-    loaddata() {
-      if (!this.isNode()) return {};
-      {
-        this.fs = this.fs ? this.fs : require("fs"), this.path = this.path ? this.path : require("path");
-        const t = this.path.resolve(this.dataFile),
-          e = this.path.resolve(process.cwd(), this.dataFile),
-          s = this.fs.existsSync(t),
-          r = !s && this.fs.existsSync(e);
-        if (!s && !r) return {};
-        {
-          const r = s ? t : e;
-          try {
-            return JSON.parse(this.fs.readFileSync(r));
-          } catch (t) {
-            return {};
+  }
+  async ["getUserInfo"]() {
+    if (!this.token) return false;
+    try {
+      const _0x275826 = await this.makeHttpRequest("GET", "https://www.lvdhb.com/MiniProgramApiCore/api/v3/my/GetMyInfo", {
+        "Host": "www.lvdhb.com",
+        "token": this.token,
+        "content-type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13)XWEB/14185",
+        "Referer": "https://servicewechat.com/" + this.appid + "/139/page-frame.html"
+      });
+      return _0x275826 && typeof _0x275826 === "object" ? (this.userInfo = _0x275826, true) : false;
+    } catch (_0x1ea4c0) {
+      return false;
+    }
+  }
+  async ["signIn"]() {
+    if (!this.token) return false;
+    try {
+      const _0x592334 = await this.makeHttpRequest("POST", "https://www.lvdhb.com/MiniProgramApiCore/api/v3/Login/Sign", {
+        "Host": "www.lvdhb.com",
+        "content-type": "application/json",
+        "token": this.token,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13)XWEB/14185",
+        "Referer": "https://servicewechat.com/" + this.appid + "/139/page-frame.html"
+      }, {});
+      if (_0x592334 && _0x592334.Success) {
+        const _0x38420e = _0x592334.Data || 0;
+        return console.log("✅ [" + this.remarkName + "] 签到成功！获得 " + _0x38420e + " 积分"), {
+          "success": true,
+          "points": _0x38420e
+        };
+      } else {
+        const _0x3e7053 = _0x592334.Message || "未知错误";
+        return _0x3e7053.includes("已签到") || _0x3e7053.includes("已经签到") || _0x3e7053.includes("已完成签到") ? (console.log("ℹ️ [" + this.remarkName + "] 今日已签到"), {
+          "success": true,
+          "points": 0,
+          "already_signed": true
+        }) : (console.log("❌ [" + this.remarkName + "] 签到失败"), {
+          "success": false,
+          "error": _0x3e7053
+        });
+      }
+    } catch (_0x553cc9) {
+      return {
+        "success": false,
+        "error": _0x553cc9.message
+      };
+    }
+  }
+  async ["withdraw"]() {
+    if (!this.token) return false;
+    await this.getUserScore();
+    if (this.userScore < 100) return {
+      "success": false,
+      "reason": "insufficient_score",
+      "score": this.userScore
+    };
+    try {
+      const _0x11e09c = await this.makeHttpRequest("POST", "https://www.lvdhb.com/MiniProgramApiCore/api/v3/cash/SaveCash", {
+        "Host": "www.lvdhb.com",
+        "content-type": "application/json",
+        "token": this.token,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13)XWEB/14185",
+        "Referer": "https://servicewechat.com/" + this.appid + "/139/page-frame.html"
+      }, {
+        "AliAccount": "直接到微信钱包的余额",
+        "Score": this.userScore.toString()
+      });
+      return _0x11e09c && _0x11e09c.Success ? (console.log("💰 [" + this.remarkName + "] 提现成功！积分：" + this.userScore), {
+        "success": true,
+        "score": this.userScore
+      }) : (console.log("❌ [" + this.remarkName + "] 提现失败"), {
+        "success": false,
+        "error": _0x11e09c.Message
+      });
+    } catch (_0x43f0de) {
+      return {
+        "success": false,
+        "error": _0x43f0de.message
+      };
+    }
+  }
+  async ["getUserProfile"]() {
+    const _0x1ef5ad = JSON.stringify({
+        "api_name": "webapi_getuserprofile",
+        "data": {
+          "app_version": 68,
+          "desc": "用于获取您的个人信息",
+          "lang": "en",
+          "version": "3.7.12"
+        },
+        "env": 1,
+        "operate_directly": false,
+        "show_confirm": true,
+        "tid": Date.now() * 1000000 + Math.floor(Math.random() * 1000000),
+        "with_credentials": true
+      }),
+      _0x549be0 = await wxcode.getUserInfo(this.wxid, this.appid, _0x1ef5ad);
+    if (_0x549be0.success) {
+      if (isDebug) console.log("[DEBUG] [" + this.remarkName + "] 获取用户个人信息成功");
+      try {
+        const _0x4a67f1 = JSON.parse(_0x549be0.rawData.data);
+        return isDebug && console.log("[DEBUG] [" + this.remarkName + "] 用户信息:", {
+          "nickName": _0x4a67f1.nickName,
+          "gender": _0x4a67f1.gender,
+          "avatarUrl": _0x4a67f1.avatarUrl,
+          "city": _0x4a67f1.city,
+          "province": _0x4a67f1.province,
+          "country": _0x4a67f1.country
+        }), this.userProfile = {
+          "success": true,
+          "userInfo": _0x4a67f1,
+          "signature": _0x549be0.signature,
+          "encryptedData": _0x549be0.encryptedData,
+          "iv": _0x549be0.iv
+        }, this.userProfile;
+      } catch (_0x4127f4) {
+        return console.log("[" + this.remarkName + "] 解析用户信息失败：" + _0x4127f4.message), {
+          "success": false,
+          "error": _0x4127f4.message
+        };
+      }
+    } else return console.log("[" + this.remarkName + "] 获取用户个人信息失败：" + _0x549be0.error), null;
+  }
+  async ["performFullLogin"]() {
+    const _0x2852bc = await this.getWxCodeAndLogin();
+    if (!_0x2852bc) {
+      return console.log("❌ [" + this.remarkName + "] 授权码获取失败"), false;
+    }
+    const _0x50c2bc = await this.loginToLvdhb();
+    if (!_0x50c2bc) {
+      return false;
+    }
+    return await this.getUserInfo(), await this.getUserScore(), this.saveTokenCache(), true;
+  }
+  async ["executeBusinessLogic"]() {
+    try {
+      if (!this.token) return false;
+      let _0x10b7b0 = true;
+      const _0x18e851 = await this.signIn();
+      if (!_0x18e851 || !_0x18e851.success) {
+        if (_0x18e851 && _0x18e851.error && (_0x18e851.error.includes("token") || _0x18e851.error.includes("登录") || _0x18e851.error.includes("认证"))) return false;
+        _0x10b7b0 = false;
+      }
+      const _0xf0d954 = await this.getUserScore();
+      if (!_0xf0d954) return false;
+      console.log("📊 [" + this.remarkName + "] 当前积分：" + this.userScore);
+      if (this.userScore >= 100) {
+        console.log("🔔 [" + this.remarkName + "] 开始自动提现...");
+        const _0x35d8d6 = await this.withdraw();
+        if (!_0x35d8d6 || !_0x35d8d6.success) {
+          if (_0x35d8d6 && _0x35d8d6.error && (_0x35d8d6.error.includes("token") || _0x35d8d6.error.includes("登录") || _0x35d8d6.error.includes("认证"))) return false;
+        } else this.userScore = 0;
+      }
+      return this.saveTokenCache(), _0x10b7b0;
+    } catch (_0x398814) {
+      return false;
+    }
+  }
+  async ["run"]() {
+    try {
+      const _0x46a3fb = this.loadTokenCache();
+      if (_0x46a3fb) {
+        const _0xdf86d9 = await this.executeBusinessLogic();
+        if (!_0xdf86d9) {
+          console.log("⚠️ [" + this.remarkName + "] 重新登录...");
+          const _0x3b0dc7 = await this.performFullLogin();
+          if (!_0x3b0dc7) {
+            console.log("❌ [" + this.remarkName + "] 重新登录失败");
+            return;
+          }
+          const _0x55dc0b = await this.executeBusinessLogic();
+          if (!_0x55dc0b) {
+            console.log("❌ [" + this.remarkName + "] 执行失败");
+            return;
           }
         }
-      }
-    }
-    writedata() {
-      if (this.isNode()) {
-        this.fs = this.fs ? this.fs : require("fs"), this.path = this.path ? this.path : require("path");
-        const t = this.path.resolve(this.dataFile),
-          e = this.path.resolve(process.cwd(), this.dataFile),
-          s = this.fs.existsSync(t),
-          r = !s && this.fs.existsSync(e),
-          a = JSON.stringify(this.data);
-        s ? this.fs.writeFileSync(t, a) : r ? this.fs.writeFileSync(e, a) : this.fs.writeFileSync(t, a);
-      }
-    }
-    lodash_get(t, e, s = void 0) {
-      const r = e.replace(/\[(\d+)\]/g, ".$1").split(".");
-      let a = t;
-      for (const t of r) if (a = Object(a)[t], void 0 === a) return s;
-      return a;
-    }
-    lodash_set(t, e, s) {
-      return Object(t) !== t || (Array.isArray(e) || (e = e.toString().match(/[^.[\]]+/g) || []), e.slice(0, -1).reduce((t, s, r) => Object(t[s]) === t[s] ? t[s] : t[s] = Math.abs(e[r + 1]) >> 0 == +e[r + 1] ? [] : {}, t)[e[e.length - 1]] = s), t;
-    }
-    getdata(t) {
-      let e = this.getval(t);
-      if (/^@/.test(t)) {
-        const [, s, r] = /^@(.*?)\.(.*?)$/.exec(t),
-          a = s ? this.getval(s) : "";
-        if (a) try {
-          const t = JSON.parse(a);
-          e = t ? this.lodash_get(t, r, "") : e;
-        } catch (t) {
-          e = "";
+      } else {
+        const _0x256ae8 = await this.performFullLogin();
+        if (!_0x256ae8) {
+          console.log("❌ [" + this.remarkName + "] 登录失败");
+          return;
+        }
+        const _0x216eb9 = await this.executeBusinessLogic();
+        if (!_0x216eb9) {
+          console.log("❌ [" + this.remarkName + "] 执行失败");
+          return;
         }
       }
-      return e;
+      console.log("✅ [" + this.remarkName + "] 完成");
+    } catch (_0x5517c6) {
+      console.log("❌ [" + this.remarkName + "] 出错：" + _0x5517c6.message);
     }
-    setdata(t, e) {
-      let s = !1;
-      if (/^@/.test(e)) {
-        const [, r, a] = /^@(.*?)\.(.*?)$/.exec(e),
-          i = this.getval(r),
-          o = r ? "null" === i ? null : i || "{}" : "{}";
-        try {
-          const e = JSON.parse(o);
-          this.lodash_set(e, a, t), s = this.setval(JSON.stringify(e), r);
-        } catch (e) {
-          const i = {};
-          this.lodash_set(i, a, t), s = this.setval(JSON.stringify(i), r);
-        }
-      } else s = this.setval(t, e);
-      return s;
-    }
-    getval(t) {
-      switch (this.getEnv()) {
-        case "Surge":
-        case "Loon":
-        case "Stash":
-        case "Shadowrocket":
-          return $persistentStore.read(t);
-        case "Quantumult X":
-          return $prefs.valueForKey(t);
-        case "Node.js":
-          return this.data = this.loaddata(), this.data[t];
-        default:
-          return this.data && this.data[t] || null;
-      }
-    }
-    setval(t, e) {
-      switch (this.getEnv()) {
-        case "Surge":
-        case "Loon":
-        case "Stash":
-        case "Shadowrocket":
-          return $persistentStore.write(t, e);
-        case "Quantumult X":
-          return $prefs.setValueForKey(t, e);
-        case "Node.js":
-          return this.data = this.loaddata(), this.data[e] = t, this.writedata(), !0;
-        default:
-          return this.data && this.data[e] || null;
-      }
-    }
-    initGotEnv(t) {
-      this.got = this.got ? this.got : require("got"), this.cktough = this.cktough ? this.cktough : require("tough-cookie"), this.ckjar = this.ckjar ? this.ckjar : new this.cktough.CookieJar(), t && (t.headers = t.headers ? t.headers : {}, void 0 === t.headers.Cookie && void 0 === t.cookieJar && (t.cookieJar = this.ckjar));
-    }
-    get(t, e = () => {}) {
-      switch (t.headers && (delete t.headers["Content-Type"], delete t.headers["Content-Length"], delete t.headers["content-type"], delete t.headers["content-length"]), t.params && (t.url += "?" + this.queryStr(t.params)), void 0 === t.followRedirect || t.followRedirect || ((this.isSurge() || this.isLoon()) && (t["auto-redirect"] = !1), this.isQuanX() && (t.opts ? t.opts.redirection = !1 : t.opts = {
-        redirection: !1
-      })), this.getEnv()) {
-        case "Surge":
-        case "Loon":
-        case "Stash":
-        case "Shadowrocket":
-        default:
-          this.isSurge() && this.isNeedRewrite && (t.headers = t.headers || {}, Object.assign(t.headers, {
-            "X-Surge-Skip-Scripting": !1
-          })), $httpClient.get(t, (t, s, r) => {
-            !t && s && (s.body = r, s.statusCode = s.status ? s.status : s.statusCode, s.status = s.statusCode), e(t, s, r);
-          });
-          break;
-        case "Quantumult X":
-          this.isNeedRewrite && (t.opts = t.opts || {}, Object.assign(t.opts, {
-            hints: !1
-          })), $task.fetch(t).then(t => {
-            const {
-              statusCode: s,
-              statusCode: r,
-              headers: a,
-              body: i,
-              bodyBytes: o
-            } = t;
-            e(null, {
-              status: s,
-              statusCode: r,
-              headers: a,
-              body: i,
-              bodyBytes: o
-            }, i, o);
-          }, t => e(t && t.error || "UndefinedError"));
-          break;
-        case "Node.js":
-          let s = require("iconv-lite");
-          this.initGotEnv(t), this.got(t).on("redirect", (t, e) => {
-            try {
-              if (t.headers["set-cookie"]) {
-                const s = t.headers["set-cookie"].map(this.cktough.Cookie.parse).toString();
-                s && this.ckjar.setCookieSync(s, null), e.cookieJar = this.ckjar;
-              }
-            } catch (t) {
-              this.logErr(t);
-            }
-          }).then(t => {
-            const {
-                statusCode: r,
-                statusCode: a,
-                headers: i,
-                rawBody: o
-              } = t,
-              n = s.decode(o, this.encoding);
-            e(null, {
-              status: r,
-              statusCode: a,
-              headers: i,
-              rawBody: o,
-              body: n
-            }, n);
-          }, t => {
-            const {
-              message: r,
-              response: a
-            } = t;
-            e(r, a, a && s.decode(a.rawBody, this.encoding));
-          });
-      }
-    }
-    post(t, e = () => {}) {
-      const s = t.method ? t.method.toLocaleLowerCase() : "post";
-      switch (t.body && t.headers && !t.headers["Content-Type"] && !t.headers["content-type"] && (t.headers["content-type"] = "application/x-www-form-urlencoded"), t.headers && (delete t.headers["Content-Length"], delete t.headers["content-length"]), void 0 === t.followRedirect || t.followRedirect || ((this.isSurge() || this.isLoon()) && (t["auto-redirect"] = !1), this.isQuanX() && (t.opts ? t.opts.redirection = !1 : t.opts = {
-        redirection: !1
-      })), this.getEnv()) {
-        case "Surge":
-        case "Loon":
-        case "Stash":
-        case "Shadowrocket":
-        default:
-          this.isSurge() && this.isNeedRewrite && (t.headers = t.headers || {}, Object.assign(t.headers, {
-            "X-Surge-Skip-Scripting": !1
-          })), $httpClient[s](t, (t, s, r) => {
-            !t && s && (s.body = r, s.statusCode = s.status ? s.status : s.statusCode, s.status = s.statusCode), e(t, s, r);
-          });
-          break;
-        case "Quantumult X":
-          t.method = s, this.isNeedRewrite && (t.opts = t.opts || {}, Object.assign(t.opts, {
-            hints: !1
-          })), $task.fetch(t).then(t => {
-            const {
-              statusCode: s,
-              statusCode: r,
-              headers: a,
-              body: i,
-              bodyBytes: o
-            } = t;
-            e(null, {
-              status: s,
-              statusCode: r,
-              headers: a,
-              body: i,
-              bodyBytes: o
-            }, i, o);
-          }, t => e(t && t.error || "UndefinedError"));
-          break;
-        case "Node.js":
-          let r = require("iconv-lite");
-          this.initGotEnv(t);
-          const {
-            url: a,
-            ...i
-          } = t;
-          this.got[s](a, i).then(t => {
-            const {
-                statusCode: s,
-                statusCode: a,
-                headers: i,
-                rawBody: o
-              } = t,
-              n = r.decode(o, this.encoding);
-            e(null, {
-              status: s,
-              statusCode: a,
-              headers: i,
-              rawBody: o,
-              body: n
-            }, n);
-          }, t => {
-            const {
-              message: s,
-              response: a
-            } = t;
-            e(s, a, a && r.decode(a.rawBody, this.encoding));
-          });
-      }
-    }
-    time(t, e = null) {
-      const s = e ? new Date(e) : new Date();
-      let r = {
-        "M+": s.getMonth() + 1,
-        "d+": s.getDate(),
-        "H+": s.getHours(),
-        "m+": s.getMinutes(),
-        "s+": s.getSeconds(),
-        "q+": Math.floor((s.getMonth() + 3) / 3),
-        S: s.getMilliseconds()
-      };
-      /(y+)/.test(t) && (t = t.replace(RegExp.$1, (s.getFullYear() + "").substr(4 - RegExp.$1.length)));
-      for (let e in r) new RegExp("(" + e + ")").test(t) && (t = t.replace(RegExp.$1, 1 == RegExp.$1.length ? r[e] : ("00" + r[e]).substr(("" + r[e]).length)));
-      return t;
-    }
-    queryStr(t) {
-      let e = "";
-      for (const s in t) {
-        let r = t[s];
-        null != r && "" !== r && ("object" == typeof r && (r = JSON.stringify(r)), e += `${s}=${r}&`);
-      }
-      return e = e.substring(0, e.length - 1), e;
-    }
-    msg(e = t, s = "", r = "", a) {
-      const i = t => {
-        switch (typeof t) {
-          case void 0:
-            return t;
-          case "string":
-            switch (this.getEnv()) {
-              case "Surge":
-              case "Stash":
-              default:
-                return {
-                  url: t
-                };
-              case "Loon":
-              case "Shadowrocket":
-                return t;
-              case "Quantumult X":
-                return {
-                  "open-url": t
-                };
-              case "Node.js":
-                return;
-            }
-          case "object":
-            switch (this.getEnv()) {
-              case "Surge":
-              case "Stash":
-              case "Shadowrocket":
-              default:
-                return {
-                  url: t.url || t.openUrl || t["open-url"]
-                };
-              case "Loon":
-                return {
-                  openUrl: t.openUrl || t.url || t["open-url"],
-                  mediaUrl: t.mediaUrl || t["media-url"]
-                };
-              case "Quantumult X":
-                return {
-                  "open-url": t["open-url"] || t.url || t.openUrl,
-                  "media-url": t["media-url"] || t.mediaUrl,
-                  "update-pasteboard": t["update-pasteboard"] || t.updatePasteboard
-                };
-              case "Node.js":
-                return;
-            }
-          default:
-            return;
-        }
-      };
-      if (!this.isMute) switch (this.getEnv()) {
-        case "Surge":
-        case "Loon":
-        case "Stash":
-        case "Shadowrocket":
-        default:
-          $notification.post(e, s, r, i(a));
-          break;
-        case "Quantumult X":
-          $notify(e, s, r, i(a));
-        case "Node.js":
-      }
-      if (!this.isMuteLog) {
-        let t = ["", "==============\uD83D\uDCE3\u7CFB\u7EDF\u901A\u77E5\uD83D\uDCE3=============="];
-        t.push(e), s && t.push(s), r && t.push(r), console.log(t.join("\n")), this.logs = this.logs.concat(t);
-      }
-    }
-    log(...t) {
-      t.length > 0 && (this.logs = [...this.logs, ...t]), console.log(t.join(this.logSeparator));
-    }
-    logErr(t, e) {
-      switch (this.getEnv()) {
-        case "Surge":
-        case "Loon":
-        case "Stash":
-        case "Shadowrocket":
-        case "Quantumult X":
-        default:
-          this.log("", `❗️${this.name}, 错误!`, t);
-          break;
-        case "Node.js":
-          this.log("", `❗️${this.name}, 错误!`, t.stack);
-      }
-    }
-    wait(t) {
-      return new Promise(e => setTimeout(e, t));
-    }
-    done(t = {}) {
-      const e = (new Date().getTime() - this.startTime) / 1000;
-      switch (this.log("", `🔔${this.name}, 结束! 🕛 ${e} 秒`), this.log(), this.getEnv()) {
-        case "Surge":
-        case "Loon":
-        case "Stash":
-        case "Shadowrocket":
-        case "Quantumult X":
-        default:
-          $done(t);
-          break;
-        case "Node.js":
-          process.exit(1);
-      }
-    }
-  }(t, e);
+  }
 }
+async function main() {
+  console.log("🚀 " + scriptName + "开始...");
+  if (KAMI_VERIFY_SWITCH === 1) {
+    const _0x5e21f1 = await verifyKami(kamiKey);
+    !_0x5e21f1.success && (console.log("❌ 卡密验证失败: " + _0x5e21f1.message), process.exit(1));
+    console.log("✅ 卡密验证成功");
+    if (_0x5e21f1.data) {
+      const _0x16bb98 = _0x5e21f1.data;
+      if (_0x16bb98.card_type === "time") console.log("   有效期: " + _0x16bb98.duration + " 天");else {
+        if (_0x16bb98.card_type === "count") {
+          console.log("   剩余次数: " + _0x16bb98.remaining_count);
+          console.log("   总次数: " + _0x16bb98.total_count);
+        }
+      }
+    }
+  } else console.log("🔓 卡密验证已关闭，跳过验证步骤");
+  console.log("=".repeat(60) + "\n");
+  console.log("♻️ 绿袋回收：环保签到赚积分，积分满100自动提现到微信！ ♻️");
+  console.log("=".repeat(60) + "\n");
+  if (!wxidList) {
+    console.log("❌ 未设置环境变量 LDHS_WXID 或 TXX_WXID");
+    return;
+  }
+  const _0x5d8ef9 = cmdWxid ? [cmdWxid] : parseWxidList(wxidList);
+  if (_0x5d8ef9.length === 0) {
+    console.log("❌ 没有找到有效的wxid");
+    return;
+  }
+  console.log("📋 共找到 " + _0x5d8ef9.length + " 个账号");
+  isDebug && console.log("[DEBUG] 账号: " + _0x5d8ef9.join(", "));
+  for (let _0x355bce = 0; _0x355bce < _0x5d8ef9.length; _0x355bce++) {
+    const _0x19101c = _0x5d8ef9[_0x355bce],
+      _0x3430fc = typeof wxcode.getRemarkName === "function" ? wxcode.getRemarkName(_0x19101c) : _0x19101c;
+    console.log("\n🚀 [" + (_0x355bce + 1) + "/" + _0x5d8ef9.length + "] " + _0x3430fc);
+    try {
+      const _0x24f364 = new ScriptTemplate(_0x19101c);
+      await _0x24f364.run();
+    } catch (_0x416731) {
+      console.log("❌ [" + _0x3430fc + "] 处理失败: " + _0x416731.message);
+    }
+    console.log("─".repeat(60));
+    _0x355bce < _0x5d8ef9.length - 1 && (await new Promise(_0x5c8ef6 => setTimeout(_0x5c8ef6, 5000)));
+  }
+  console.log("\n🎉 处理完成！");
+  NOTICE_SWITCH && notice && (await sendMsg(notice));
+}
+let notice = "";
+function print(_0x1b5068, _0x542704 = false) {
+  let _0x47be78 = "" + _0x1b5068;
+  console.log(_0x47be78);
+  NOTICE_SWITCH && _0x542704 && (notice += _0x47be78 + "\n");
+}
+async function sendMsg(_0x490bf0) {
+  try {
+    let _0x2d988b = "";
+    try {
+      _0x2d988b = require("./sendNotify");
+    } catch (_0x1a5fec) {
+      try {
+        _0x2d988b = require("../sendNotify");
+      } catch (_0xa424a3) {
+        console.log("❌ 未找到sendNotify模块，无法发送通知");
+        return;
+      }
+    }
+    await _0x2d988b.sendNotify(scriptName, _0x490bf0);
+    console.log("📢 通知发送成功");
+  } catch (_0x1db88d) {
+    console.log("❌ 通知发送失败: " + _0x1db88d.message);
+  }
+}
+main().catch(console.error);
